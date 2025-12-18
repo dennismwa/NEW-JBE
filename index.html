@@ -1,0 +1,229 @@
+# JBE Form Submission Setup Guide
+
+## Current Status
+
+**How it currently works:**
+- Form data is only logged to the browser console (not saved)
+- Opens a `mailto:` link to `info@tverze.com` (requires user to manually send email)
+- **Problem:** Data is NOT automatically saved anywhere - relies on user manually sending email
+
+## Recommended Solutions
+
+### Option 1: Google Sheets (FREE & BEST) ⭐
+
+**Benefits:**
+- ✅ Free
+- ✅ All submissions automatically saved to Google Sheets
+- ✅ Easy to view, sort, filter, and export
+- ✅ Can set up email notifications
+- ✅ Can export to Excel/CSV anytime
+
+**Setup Steps:**
+
+1. **Create a Google Sheet:**
+   - Go to [Google Sheets](https://sheets.google.com)
+   - Create a new spreadsheet named "JBE 2026 Sign-Ups"
+   - Add these column headers in Row 1:
+     ```
+     Timestamp | Full Name | Email | Location | Organization | Interests | Referral Source | Newsletter
+     ```
+
+2. **Create Google Apps Script:**
+   - In your Google Sheet, go to: **Extensions → Apps Script**
+   - Delete any existing code and paste this:
+
+   ```javascript
+   function doPost(e) {
+     try {
+       const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+       const data = JSON.parse(e.postData.contents);
+       
+       const row = [
+         data.timestamp || new Date().toISOString(),
+         data.fullName,
+         data.email,
+         data.location,
+         data.organization,
+         data.interests.join(', '),
+         data.referralSource,
+         data.newsletter
+       ];
+       
+       sheet.appendRow(row);
+       
+       // Optional: Send email notification
+       MailApp.sendEmail({
+         to: 'info@tverze.com',
+         subject: 'New JBE 2026 Sign-Up: ' + data.fullName,
+         body: 'New sign-up received:\n\n' + 
+               'Full Name: ' + data.fullName + '\n' +
+               'Email: ' + data.email + '\n' +
+               'Location: ' + data.location + '\n' +
+               'Organization: ' + data.organization + '\n' +
+               'Interests: ' + data.interests.join(', ') + '\n' +
+               'Referral Source: ' + data.referralSource + '\n' +
+               'Newsletter: ' + data.newsletter + '\n' +
+               'Timestamp: ' + data.timestamp
+       });
+       
+       return ContentService.createTextOutput(JSON.stringify({
+         success: true,
+         message: 'Data saved successfully'
+       })).setMimeType(ContentService.MimeType.JSON);
+     } catch (error) {
+       return ContentService.createTextOutput(JSON.stringify({
+         success: false,
+         error: error.toString()
+       })).setMimeType(ContentService.MimeType.JSON);
+     }
+   }
+   
+   // Optional: Test function (for debugging)
+   function doGet(e) {
+     return ContentService.createTextOutput('JBE Form Handler is active. Use POST method to submit data.');
+   }
+   ```
+   
+   **Important:** Make sure you have a `doPost` function (not just `doGet`). The form uses POST method.
+
+3. **Deploy as Web App:**
+   - Click **Deploy → New deployment**
+   - Click the gear icon ⚙️ next to "Select type" → Choose **Web app**
+   - Description: "JBE Form Submission Handler"
+   - Execute as: **Me**
+   - Who has access: **Anyone** (or "Anyone with Google account" for more security)
+   - Click **Deploy**
+   - Copy the **Web App URL** (looks like: `https://script.google.com/macros/s/...`)
+
+4. **Update the HTML:**
+   - In `home.html`, find line with: `const GOOGLE_SCRIPT_URL = 'YOUR_GOOGLE_SCRIPT_URL';`
+   - Replace `'YOUR_GOOGLE_SCRIPT_URL'` with your copied URL (keep the quotes)
+   - Example: `const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycb.../exec';`
+
+5. **Test:**
+   - Submit the form
+   - Check your Google Sheet - new row should appear!
+
+**Optional: Email Notifications**
+- In Google Apps Script, add this after `sheet.appendRow(row);`:
+  ```javascript
+  // Send email notification
+  MailApp.sendEmail({
+    to: 'info@tverze.com',
+    subject: 'New JBE 2026 Sign-Up: ' + data.fullName,
+    body: 'New sign-up received:\n\n' + JSON.stringify(data, null, 2)
+  });
+  ```
+
+---
+
+### Option 2: Formspree (FREE - Easy Setup)
+
+**Benefits:**
+- ✅ Free (up to 50 submissions/month)
+- ✅ Very easy setup (just sign up)
+- ✅ Sends email notifications
+- ✅ Can view submissions on their dashboard
+- ✅ Paid plans for more submissions
+
+**Setup Steps:**
+
+1. **Sign up:**
+   - Go to [Formspree.io](https://formspree.io)
+   - Create a free account
+   - Create a new form
+   - Copy your form ID (looks like: `xrgkqyzw`)
+
+2. **Update the HTML:**
+   - In `home.html`, find the Formspree section (around line 5015)
+   - Uncomment the Formspree code block
+   - Replace `YOUR_FORM_ID` with your Formspree form ID
+   - Comment out or remove the Google Sheets section
+
+3. **Test:**
+   - Submit the form
+   - Check your email and Formspree dashboard
+
+---
+
+### Option 3: EmailJS (FREE - Sends Direct Emails)
+
+**Benefits:**
+- ✅ Free (200 emails/month)
+- ✅ Sends emails directly (no manual sending)
+- ✅ Easy setup
+- ✅ Can also save to Google Sheets
+
+**Setup Steps:**
+
+1. **Sign up:**
+   - Go to [EmailJS.com](https://www.emailjs.com)
+   - Create free account
+   - Add email service (Gmail, Outlook, etc.)
+   - Create email template
+   - Get your Service ID, Template ID, and Public Key
+
+2. **Add EmailJS script to HTML:**
+   - Add before closing `</body>` tag:
+   ```html
+   <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
+   <script>
+     emailjs.init("YOUR_PUBLIC_KEY");
+   </script>
+   ```
+
+3. **Update form submission code:**
+   ```javascript
+   emailjs.send('YOUR_SERVICE_ID', 'YOUR_TEMPLATE_ID', {
+     fullName: data.fullName,
+     email: data.email,
+     location: data.location,
+     organization: data.organization,
+     interests: data.interests.join(', '),
+     referralSource: data.referralSource,
+     newsletter: data.newsletter,
+     timestamp: data.timestamp
+   })
+   .then(() => {
+     // Success
+   });
+   ```
+
+---
+
+### Option 4: Server-Side Solution (Advanced)
+
+If you have a server/backend:
+- **PHP:** Save to database or send email
+- **Node.js:** Use Express + Nodemailer or save to database
+- **WordPress:** Use Contact Form 7 or Gravity Forms plugin
+
+---
+
+## Comparison Table
+
+| Solution | Cost | Setup Difficulty | Data Storage | Email Notifications |
+|----------|------|------------------|--------------|---------------------|
+| **Google Sheets** | FREE | Medium | ✅ Spreadsheet | Optional |
+| **Formspree** | FREE (50/mo) | Easy | ✅ Dashboard | ✅ Yes |
+| **EmailJS** | FREE (200/mo) | Easy | ❌ No | ✅ Yes |
+| **Current (mailto)** | FREE | None | ❌ No | ❌ Manual |
+
+---
+
+## Recommendation
+
+**Use Google Sheets (Option 1)** because:
+1. ✅ Completely free
+2. ✅ All data automatically saved in organized spreadsheet
+3. ✅ Easy to export to Excel/CSV
+4. ✅ Can add email notifications
+5. ✅ No submission limits
+6. ✅ Professional and reliable
+
+---
+
+## Need Help?
+
+If you need assistance setting up any of these options, let me know which one you prefer and I can help you implement it!
+
